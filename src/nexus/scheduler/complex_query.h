@@ -35,6 +35,17 @@ class ComplexQuery {
     }
     return latency_ / maxn;
   }
+  ComplexQuery* split() {
+    int step = std::max(std::ceil(100000000.0 / latency / latency), 1);
+    int m = min(latency / step + 1, 1);
+    vector<vector<double> > f;
+    vector<vector<double> > g;
+    for (int i = 1; i <= n; i++) {
+      for
+      redgs[]
+    }
+    
+  }
   CtrlStatus init(const LoadDependencyRequest& request) {
     models_.push_back("");
     n = request.n;
