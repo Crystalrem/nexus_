@@ -39,7 +39,8 @@ class FrontendDelegate {
   CtrlStatus LoadDependency(const LoadDependencyRequest& request);
   
   CtrlStatus CurrentRps(const CurRpsRequest& request);
-
+  
+  bool containComplexQuery() {return complexQuery_;}
  private:
   uint32_t node_id_;
   std::string ip_;
@@ -47,6 +48,7 @@ class FrontendDelegate {
   std::string rpc_port_;
   int beacon_sec_;
   long timeout_ms_;
+  bool complexQuery_;
   ComplexQuery query_;
   std::unique_ptr<FrontendCtrl::Stub> stub_;
   std::chrono::time_point<std::chrono::system_clock> last_time_;

@@ -59,8 +59,13 @@ void FrontendDelegate::SubscribeModel(const std::string& model_session_id) {
   subscribe_models_.insert(model_session_id);
 }
 CtrlStatus FrontDelegate::LoadDepedency(const LoadDependencyRequest& request) {
+  complexQuery_ = true;
   return query_.init(request);
 }
+
+void FrontendDelegate::CurrentRps(const CurRpsRequest& request){
+  query_.addRecord(request);
+} 
 CtrlStatus FrontendDelegate::UpdateModelRoutesRpc(
     const ModelRouteUpdates& request) {
   RpcReply reply;

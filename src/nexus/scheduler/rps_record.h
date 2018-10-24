@@ -40,12 +40,14 @@ class RpsRecord {
       }
     }
   }
-  void add(double interval, std::vector<std::pair<std::string, double>> cur_models_rps) {
+  void add(const CurRpsRequest& request) {
+    double interval = request.interval;
+    uint32_t n = request.n;
     models_rps[0].push(interval);
     end += 1;
-    for (auto it = cur_models_rps.begin(); it != cur_models_rps.end(); it++) {
-      uint32_t id = models_id[it->first];
-      models_rps[id][end](it->second);
+    for (int i = 0; i < n; i++) {
+      uint32_t id = models_id[request.model_rps(i).model];
+      models_rps[id][end] = request.model_rps(i).rps;
     }
     len++;
     if(len > max_size) {

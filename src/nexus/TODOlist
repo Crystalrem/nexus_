@@ -1,0 +1,6 @@
+extend app -> construct LoadDependencyRequest
+frontend -> loadDependency() {complexQuery = true;}
+
+multi complex query:
+multi start point
+multi end point

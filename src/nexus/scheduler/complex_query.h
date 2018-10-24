@@ -64,6 +64,9 @@ class ComplexQuery {
     rps.init(models_id_, split);
     return Ctrl_OK;
   }
+  void addRecord(const CurRpsRequest& request) {
+    rps.add(request);
+  }
  private:
   uint32_t n;
   double latency;

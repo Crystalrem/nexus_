@@ -141,7 +141,7 @@ message LoadDependencyRequest {
 }
 
 message ModelRps {
-  ModelSession model = 100;
+  string model = 100;
   double rps = 2;
 }
 message CurRpsRequest {

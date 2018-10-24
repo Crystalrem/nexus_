@@ -140,7 +140,7 @@ void Scheduler::CurrentRps(const grpc::ServerContest& ctx,
     reply->set_status(FRONTEND_NOT_FOUND);
     return;
   }        
-  return frontend.currentRps(request);  
+  return frontend.CurrentRps(request);  
 }
 void Scheduler::LoadModel(const grpc::ServerContext& ctx,
                           const LoadModelRequest& request,
@@ -694,6 +694,36 @@ void Scheduler::BeaconCheck() {
     LOG(INFO) << "Remove frontend " << frontend->node_id() <<
         ", last alive time: " << std::ctime(&last_time);
     RemoveFrontend(frontend);
+  }
+  // 1.5. Complex query
+  std::vector<FrontendDelegatePtr> frontends;
+  for (auto iter : frontends_) {
+    auto frontend = iter.second;
+    if(frontend->containComplexQuery()) {
+      query = frontend->split();
+      //delete expired sessions
+      std::unordered_set<BackendDelegatePtr> update_backends;
+      for (auto model_sess_id : query->last_subscribe_models()) {
+        ServerList& subs = session_subscribers_.at(model_sess_id);
+        subs.erase(frontend->node_id());
+        if (subs.empty()) {
+          auto session_info = session_table_.at(model_sess_id);
+          if (session_info->has_static_workload) {
+            continue;
+          }
+        LOG(INFO) << "Remove model session: " << model_sess_id;
+        RemoveFromSessionGroup(&session_info->model_sessions, model_sess_id);
+        for (auto iter : session_info->backend_throughputs) {
+          auto backend = GetBackend(iter.first);
+          backend->UnloadModel(model_sess_id);
+          update_backends.insert(backend);
+        }
+        session_table_.erase(model_sess_id);
+        } 
+      }
+      //add new session
+      //TODO construct LoadmodelRequest
+    }
   }
   
   // 2. Aggregate model session rps
