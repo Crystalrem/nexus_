@@ -98,11 +98,12 @@ void Scheduler::Register(const grpc::ServerContext& ctx,
         request.node_id(), ip, request.server_port(), request.rpc_port(),
         request.gpu_device_name(), request.gpu_available_memory(),
         beacon_interval_sec_, epoch_interval_sec_);
+    common_gpu_ = gpu_device;
     RegisterBackend(std::move(backend), reply);
   } else { // FRONTEND_NODE
     auto frontend = std::make_shared<FrontendDelegate>(
         request.node_id(), ip, request.server_port(), request.rpc_port(),
-        beacon_interval_sec_);
+        beacon_interval_sec_, common_gpu_);
     RegisterFrontend(std::move(frontend), reply);
   }
 }
@@ -700,10 +701,14 @@ void Scheduler::BeaconCheck() {
   for (auto iter : frontends_) {
     auto frontend = iter.second;
     if(frontend->containComplexQuery()) {
-      query = frontend->split();
+      auto query_split = frontend->split();
+      if(query_split.updated() == false) {
+        continue;
+      }
       //delete expired sessions
       std::unordered_set<BackendDelegatePtr> update_backends;
-      for (auto model_sess_id : query->last_subscribe_models()) {
+      for (auto model_sess: query_spilt->last_subscribe_models()) {
+        auto model_sess_id = ModelSessionToString(model_sess);
         ServerList& subs = session_subscribers_.at(model_sess_id);
         subs.erase(frontend->node_id());
         if (subs.empty()) {
@@ -722,7 +727,33 @@ void Scheduler::BeaconCheck() {
         } 
       }
       //add new session
-      //TODO construct LoadmodelRequest
+      for (auto model_sess: query_split->cur_subscribe_models()) {
+        auto info = ModelDatabase::Singleton().GetModelInfo(
+          ModelSessionToModelID(model_sess));
+        if ((*info)["resizable"] && (*info)["resizable"].as<bool>()) {
+          if (model_sess.image_height() == 0) {
+          // Set default image size for resizable CNN
+            model_sess.set_image_height((*info)["image_height"].as<uint32_t>());
+            model_sess.set_image_width((*info)["image_width"].as<uint32_t>());
+          }
+        }
+        std::string model_sess_id = ModelSessionToString(model_sess);
+        float workload = 0;
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto frontend = iter;
+        if (session_table_.find(model_sess_id) != session_table_.end()) {
+        // TODO: For now, if model session is already loaded, don't allocate
+        // new backends, just rely on epoch scheduling
+          GetModelRoute(model_sess_id, reply->mutable_model_route());
+          frontend->SubscribeModel(model_sess_id);
+          if (session_subscribers_.count(model_sess_id) == 0) {
+            session_subscribers_.emplace(model_sess_id, ServerList{request.node_id()});
+          } else {
+            session_subscribers_.at(model_sess_id).insert(request.node_id());
+          }
+        }
+      }
     }
   }
   

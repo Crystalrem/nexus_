@@ -60,7 +60,7 @@ void FrontendDelegate::SubscribeModel(const std::string& model_session_id) {
 }
 CtrlStatus FrontDelegate::LoadDepedency(const LoadDependencyRequest& request) {
   complexQuery_ = true;
-  return query_.init(request);
+  return query_.init(request, common_gpu_);
 }
 
 void FrontendDelegate::CurrentRps(const CurRpsRequest& request){

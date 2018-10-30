@@ -54,6 +54,7 @@ class FrontendDelegate {
   std::chrono::time_point<std::chrono::system_clock> last_time_;
   std::unordered_set<std::string> subscribe_models_;
   RpsRecord rpsRecord_;
+  std::string common_gpu_;
 };
 
 } // namespace scheduler

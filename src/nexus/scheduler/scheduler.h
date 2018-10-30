@@ -286,6 +286,8 @@ class Scheduler : public AsyncRpcServiceBase<AsyncService> {
   std::unordered_map<std::string, ServerList> session_subscribers_;
   /*! \brief Mutex for accessing internal data */
   std::mutex mutex_;
+  
+  std::string common_gpu_;
 };
 
 } // namespace scheduler

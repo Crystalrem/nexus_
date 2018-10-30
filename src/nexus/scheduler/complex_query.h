@@ -1,6 +1,51 @@
+#ifndef NEXUS_SCHEDULER_COMPLEXQUERY_H_
+#define NEXUS_SCHEDULER_COMPLEXQUERY_H_
+
 #include "nexus/scheduler/frontend_delegate.h"
 #include "nexus/scheduler/scheduler.h"
 #include "nexus/scheduler/rps_record.h"
+#include "nexus/common/model_db.cpp"
+class QuerySplit {
+
+ public:
+  QuerySplit() {}
+  void addModel(ModelSession model, double lat) {
+    models_.push_back(model);
+    latencys_.push_back(lat);
+  }
+  void updateLatencys(std::vector<uint32_t> latencys) {
+    for (int i = 0; i < models_.size(); i++) {
+      last_latencys_ = latencys_[i];
+      latencys_[i] = latencys[i];
+    }
+  }
+  
+  std::vector<ModelSession> last_subscribe_models() {
+    std::vector<ModelSession> ret;
+    for (int i = 0; i < models_.size(); i++) {
+      ModelSession tmp = models_[i];
+      tmp.set_latency_sla(last_latencys[i]);
+      ret.push_back(tmp);
+    }
+    return ret;
+  }
+  
+  std::vector<ModelSession> cur_subscribe_models() {
+    std::vector<ModelSession> ret;
+    for (int i = 0; i < models_.size(); i++) {
+      ModelSession tmp = models_[i];
+      tmp.set_latency_sla(latencys[i]);
+      ret.push_back(tmp);
+    }
+    return ret;
+  }
+ private:
+  std::vector<ModelSession> models_;
+  std::vector<uint32_t> latencys_;
+  std::vector<uint32_t> last_latencys_;
+  
+}
+
 class ComplexQuery {
  public:
   ComplexQuery() {}
@@ -35,24 +80,104 @@ class ComplexQuery {
     }
     return latency_ / maxn;
   }
-  ComplexQuery* split() {
-    int step = std::max(std::ceil(100000000.0 / latency / latency), 1);
-    int m = min(latency / step + 1, 1);
-    vector<vector<double> > f;
-    vector<vector<double> > g;
+ComplexQuery* split() {
+    std::vector<double>alpha = rps.getRecord();
+    int m = latency_ / step_;
+    std::vector<std::vector<double> > f, g, last_batch, last_lat;
+    std::vector<int> q;
+    std::vector<bool> visit;
+    std::vector<double> lats;
+    std::vector<double> split;
+    for (int i = 0; i <= n; i++) {
+      visit.push_back(false);
+      split.push_back(0.0);
+      f.push_back(std::vector<double>());
+      g.push_back(std::vector<double>());
+      //last_batch.push_back(std::vector<double>());
+      last_lat.push_back(std::vector<double>());
+      last.push_back(vector)
+      if(i == 0) {
+        for (int j = 0; j <= m; j++) {
+          f[i].push_back(0.0);
+        }        
+      }
+      else {
+        for (int j = 0; j <= m; j++) {
+          f[i].push_back(max_float);
+        }
+      }
+      for (int j = 0; j <= m; j++) {
+        g[i].push_back(0.0);
+        //last_batch[i].push_back(0.0);
+        last_lat.push_back(0.0);
+      }
+    }
     for (int i = 1; i <= n; i++) {
-      for
-      redgs[]
+      int now = node_[i];
+      for(int j = 0; j <= m; j++) {
+        for (int k = 0; k < redges_[now].size(); k++) {
+          int x = redges_[now][k];
+          g[now][j] = max(g[now][j], f[x][j]);
+          
+        }
+        for (int k = 0; k <= m; k++) {
+          throughput = max_throughput_[now][j - k].first;
+          batch = max_throughput_[now][j - k].second;
+          double ngpu = throughput > 0 ? alpha[now] / throughput : max_float;
+          double tmp = g[now][k] + ngpu;
+          if(f[now][j] > tmp) {
+            f[now][j] = tmp;
+            //last_batch[now][j] = batch;
+            last_lat[now][j] = j - k;
+          }
+        }
+        if(j > 0 && f[now][j] > f[now][j - 1]) {
+          f[now][j] = f[now][j - 1];
+          //last_batch[now][j] = last_batch[now][j - 1];
+          last_lat[now][j] = last_lat[now][j - 1];
+        }
+      }
+    }
+    int l = -1, r = -1;
+    for (int i = 1; i <= n; i++) {
+      if (edge[i].size() == 0) {
+        r ++;
+        q.push_back(i);
+        lats.push_back(m);
+        visit[i] = true;
+      }
     }
     
+    while(l < r) {
+      l ++;
+      int now = q[l], lat = lats[l];
+      if(now == 0) {
+        break;
+      }
+      split[now - 1] = last_lat[now][lat];
+      for (int i = 0; i < redge[now].size(); i++) {
+        int x = redge[now][i];
+        if(visit[x] == false) {
+          visit[x] = true;
+          r ++;
+          q.push_back(x);
+          lats.push_back(lat - split[now]);
+        }
+      }
+    }
+    qs.updateLatencys(split);
+    return qs;
   }
-  CtrlStatus init(const LoadDependencyRequest& request) {
+  
+  CtrlStatus init(const LoadDependencyRequest& request, std::string common_gpu) {
+    common_gpu_ = common_gpu;
     models_.push_back("");
     n = request.n;
     m = request.m;
     latency = request.latency;
     for (int i = 0; i < n; i++) {
       std::model = ModelSessionToString(request.models(i));
+      model_sessions_.push_back(request.models(i));
       models_id_[model] = i + 1;
       models_.push_back(model);
     }
@@ -71,9 +196,30 @@ class ComplexQuery {
       redges[v2].push_back(v1);
       degrees_[v2] ++;
     }
+    step_ = std::max(std::ceil(100000000.0 / latency / latency), 1);
+    int m = latency / step;
+    latency_ = step * m;
+    max_throughput_.push_back(std::vector<std::pair<float, uint32_t>>());
+    for (int i = 0; i < n; i++) {
+      std::string profile_id = ModelSessionToProfileID(model_sess);
+      auto profile = ModelDatabase::Singleton().GetModelProfile(common_gpu_, profile_id);
+      if (profile == nullptr) {
+        // Cannot find model profile
+        return CTRL_PROFILER_UNAVALIABLE
+      }
+      max_throughput_.push_back(std::vector<std::pair<float, uint32_t>>());
+      max_throughput_[i].push_back(std::make_pair(0.0, 0));
+      for (int j = 1; j <= m; j++) {
+        int lat = j * step_;
+        max_throughput_[i].push_back(profile->GetMaxThroughput(lat));
+      }
+    }
     double split = structure(n);
+    for (int i = 0; i < n; i++) {
+      qs.addModel(request.models(i), split);
+    }
     rps.init(models_id_, split);
-    return Ctrl_OK;
+    return CTRL_OK;
   }
   void addRecord(const CurRpsRequest& request) {
     rps.add(request);
@@ -81,14 +227,19 @@ class ComplexQuery {
  private:
   uint32_t n;
   double latency;
+  std::vector<ModelSession> model_sessions_;
   std::map<std::string, uint32_t> models_id_;
-  std::vector<vector<uint32_t> > edges_;
-  std::vector<vector<uint32_t> > redges_;
+  std::vector<std::vector<uint32_t> > edges_;
+  std::vector<std::vector<uint32_t> > redges_;
   std::vector<std::string> models_;
   std::vector<double> intervals_;
   std::vector<uint32_t> degrees_;
   std::vector<uint32_t> depth_;
   std::vector<uint32_t> node_; 
+  std::string common_gpu_;
   double latency_;
+  int step_;  
+  std::vector<std::vector<std::pair<uint32_t, float>> > max_throughput_;
   RpsRecord rps;
+  QuerySplit qs;
 }
