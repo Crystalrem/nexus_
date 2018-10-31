@@ -19,6 +19,15 @@ class QuerySplit {
       latencys_[i] = latencys[i];
     }
   }
+  void constructSplit(std::vector<uint32_t> latencys) {
+    std::vector<ModelSession> ret;
+    for (int i = 0; i < models_.size(); i++) {
+      ModelSession tmp = models_[i];
+      tmp.set_latency_sla(latencys[i]);
+      ret.push_back(tmp);
+    }
+    return ret;
+  }
   
   std::vector<ModelSession> last_subscribe_models() {
     std::vector<ModelSession> ret;
@@ -39,10 +48,17 @@ class QuerySplit {
     }
     return ret;
   }
+  void set_state(bool state) {
+    state_ = state;
+  }
+  bool get_state() {
+    return state_;
+  }
  private:
   std::vector<ModelSession> models_;
   std::vector<uint32_t> latencys_;
   std::vector<uint32_t> last_latencys_;
+  bool state_;
   
 }
 
@@ -80,7 +96,15 @@ class ComplexQuery {
     }
     return latency_ / maxn;
   }
-ComplexQuery* split() {
+  double gpu_need(std::vector<ModelSession> sess, std::vector<double> rps) {
+    double ret = 0;
+    for (int i = 0; i < sess.size(); i++) {
+      double throughput = max_throughputs_[i + 1][sess[i].latency_sla()].first;
+      ret += rps[i] / throughput;
+    }
+    return ret;
+  }
+  ComplexQuery* split() {
     std::vector<double>alpha = rps.getRecord();
     int m = latency_ / step_;
     std::vector<std::vector<double> > f, g, last_batch, last_lat;
@@ -165,7 +189,16 @@ ComplexQuery* split() {
         }
       }
     }
-    qs.updateLatencys(split);
+    //check: if current split is 10% better than last split
+    double n1 = gpu_need(qs.cur_subscribe_models(), alpha);
+    double n2 = gpu_need(qs.construct_split(split), alpha);
+    if(n1 > n2 * 1.1) {
+      qs.set_state(true);
+      qs.updateLatencys(split);
+    }
+    else {
+      qs.setState(false);
+    }
     return qs;
   }
   
@@ -239,7 +272,7 @@ ComplexQuery* split() {
   std::string common_gpu_;
   double latency_;
   int step_;  
-  std::vector<std::vector<std::pair<uint32_t, float>> > max_throughput_;
+  std::vector<std::vector<std::pair<float, uint32_t>> > max_throughput_;
   RpsRecord rps;
   QuerySplit qs;
 }
